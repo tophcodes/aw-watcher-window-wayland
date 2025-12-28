@@ -73,17 +73,24 @@ impl CompositorWatcher for NiriEventSource {
     }
 
     fn get_active_window(&self) -> Option<Window> {
-        let focused_window = self.state.windows.windows
+        self.state.windows.windows
             .values()
-            .find(|w| w.is_focused);
-
-        println!("{:?}", focused_window);
-        None
+            .find(|w| w.is_focused)
+            .map(|w| w.into())
     }
 }
 
 impl fmt::Debug for NiriEventSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "NiriEventSource({:?})", fd::AsRawFd::as_raw_fd(self))
+    }
+}
+
+impl From<&niri_ipc::Window> for Window {
+    fn from(niri_window: &niri_ipc::Window) -> Self {
+        Window {
+            title: niri_window.title.clone().unwrap_or_else(|| "unknown".into()),
+            appid: niri_window.app_id.clone().unwrap_or_else(|| "unknown".into())
+        }
     }
 }

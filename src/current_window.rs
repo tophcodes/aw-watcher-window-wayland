@@ -11,7 +11,6 @@
 pub struct Window {
     pub title: String,
     pub appid: String,
-    pub pid: Option<u32>,
 }
 
 // pub struct WindowState {

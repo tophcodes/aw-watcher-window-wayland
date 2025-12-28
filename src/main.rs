@@ -94,7 +94,8 @@ impl EventLoop {
                 match event.token() {
                     COMPOSITOR_TOKEN if event.is_readable() => {
                         self.watcher.read_event()?;
-                        self.watcher.get_active_window();
+                        let window = self.watcher.get_active_window();
+                        println!("{:?}", window);
                         // TODO: Update active window/idle state
                     }
                     _ => {}
