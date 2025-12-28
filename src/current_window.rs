@@ -11,6 +11,7 @@ use wl_client::toplevel_management::zwlr_foreign_toplevel_handle_v1::ZwlrForeign
 pub struct Window {
     pub title: String,
     pub appid: String,
+    pub pid: Option<u32>,
 }
 
 pub struct WindowState {
@@ -99,6 +100,7 @@ pub fn assign_toplevel_manager(globals: &wayland_client::GlobalManager) -> () {
                     let window = Window {
                         appid: "unknown".into(),
                         title: "unknown".into(),
+                        pid: None,
                     };
                     windows_state.all_windows.insert(id, window);
                     assign_toplevel_handle(&handle);

@@ -10,11 +10,12 @@ extern crate gethostname;
 extern crate getopts;
 
 #[macro_use] extern crate lazy_static;
-
 #[macro_use] extern crate smallvec;
 
 mod wl_client;
 mod current_window;
+mod compositor;
+mod compositors;
 mod idle;
 mod singleinstance;
 
@@ -82,6 +83,9 @@ fn main() {
     }
 
     println!("### Setting up display");
+    let comp = compositor::detect_compositor();
+    println!("{:?}", comp);
+    
     let display = get_wl_display();
     let mut event_queue = display.create_event_queue();
     let attached_display = (*display).clone().attach(event_queue.token());
