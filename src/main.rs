@@ -81,11 +81,11 @@ fn main() {
     println!("### Setting up display");
     let display = get_wl_display();
     let mut event_queue = display.create_event_queue();
-    let attached_display = (*display).clone().attach(event_queue.get_token());
+    let attached_display = (*display).clone().attach(event_queue.token());
 
     println!("### Fetching wayland globals");
     let globals = wayland_client::GlobalManager::new(&attached_display);
-    event_queue.sync_roundtrip(|_, _| unreachable!())
+    event_queue.sync_roundtrip(&mut (), |_, _, _| unreachable!())
         .expect("Failed to sync_roundtrip when fetching globals");
 
     println!("### Setting up toplevel manager");
@@ -115,13 +115,13 @@ fn main() {
 
     println!("### Syncing roundtrip");
     event_queue
-        .sync_roundtrip(|_, _| { /* we ignore unfiltered messages */ })
+        .sync_roundtrip(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })
         .expect("event_queue sync_roundtrip failure");
 
     println!("### Preparing poll fds");
     let poll = Poll::new()
         .expect("Failed to create poll fds");
-    let fd = event_queue.get_connection_fd();
+    let fd = display.get_connection_fd();
 
     let mut timer = TimerFd::new()
         .expect("Failed to create timer fd");
@@ -167,7 +167,7 @@ fn main() {
                 STATE_CHANGE => {
                     //println!("state change!");
                     event_queue
-                        .dispatch(|_, _| { /* we ignore unfiltered messages */ } )
+                        .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ } )
                         .expect("event_queue dispatch failure");
 
                     if let Some(ref prev_window) = prev_window {

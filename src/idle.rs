@@ -84,7 +84,7 @@ pub fn assign_kde_idle_timeout(globals: &wayland_client::GlobalManager,
                          window manager is most likely not supported")
         )?;
     let idle_timeout = idle.get_idle_timeout(&seat, timeout_ms);
-    idle_timeout.assign_mono(|_idle_timeout, event| {
+    idle_timeout.quick_assign(|_idle_timeout, event, _| {
         match event {
             KdeTimeoutEvent::Idle => {
                 println!("idle");
@@ -117,7 +117,7 @@ pub fn assign_ext_idle_notify(globals: &wayland_client::GlobalManager,
                          window manager is most likely not supported")
         )?;
     let idle_timeout = idle.get_idle_notification(timeout_ms, &seat);
-    idle_timeout.assign_mono(|_idle_timeout, event| {
+    idle_timeout.quick_assign(|_idle_timeout, event, _| {
         match event {
             Event::Idled => {
                 println!("idle");

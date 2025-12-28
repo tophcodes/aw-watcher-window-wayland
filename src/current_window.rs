@@ -45,7 +45,7 @@ fn assign_toplevel_handle(toplevel_handle: &wayland_client::Main<ToplevelHandle>
     use wl_client::toplevel_management::zwlr_foreign_toplevel_handle_v1::Event as HandleEvent;
 
     toplevel_handle
-        .assign_mono(|toplevel_handle : Main<ToplevelHandle>, event| {
+        .quick_assign(|toplevel_handle : Main<ToplevelHandle>, event, _| {
             let mut window_state = WINDOW_STATE_LOCKED.lock()
                 .expect("Unable to take lock!");
             let id = toplevel_handle.as_ref().id();
@@ -89,7 +89,7 @@ pub fn assign_toplevel_manager(globals: &wayland_client::GlobalManager) -> () {
         .instantiate_exact::<ToplevelManager>(1)
         .expect("Wayland session does not expose a ToplevelManager object, \
                  this window manager is most likely not supported")
-        .assign_mono(move |_toplevel_manager : Main<ToplevelManager>, event| {
+        .quick_assign(move |_toplevel_manager : Main<ToplevelManager>, event, _| {
             match event {
                 ToplevelEvent::Toplevel{ toplevel: handle } => {
                     //println!("new handle");
