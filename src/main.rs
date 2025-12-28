@@ -1,3 +1,6 @@
+// TODO: Do we really want this or should we fix the 50+ occurrences?
+#![allow(static_mut_refs)]
+
 // The generated code will import stuff from wayland_sys
 extern crate wayland_sys;
 extern crate wayland_client;
