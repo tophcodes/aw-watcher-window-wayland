@@ -22,8 +22,13 @@ file-lock = "1.1"
 appdirs = "0.2"
 gethostname = "0.2"
 getopts = "0.2"
+niri-ipc = { version = "25.11", optional = true }
 
 aw-client-rust = { git = "https://github.com/ActivityWatch/aw-server-rust.git" }
+
+[features]
+default = ["niri"]
+niri = ["dep:niri-ipc"]
 
 [profile.release]
 opt-level = 3

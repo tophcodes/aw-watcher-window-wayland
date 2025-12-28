@@ -35,6 +35,7 @@
           packages = with pkgs; [
             pkg-config
             openssl
+            watchexec
 
             (fenix.stable.withComponents [
               "cargo"
