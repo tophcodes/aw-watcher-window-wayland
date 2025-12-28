@@ -1,17 +1,23 @@
-use anyhow::{Result, Context};
+use anyhow::Result;
 use crate::current_window::Window;
 use std::fmt;
 use niri_ipc::socket::SOCKET_PATH_ENV as NIRI_SOCKET_PATH_ENV;
+use mio::event::Source;
+use std::os::fd;
 
-pub trait CompositorWatcher: fmt::Debug {
-    fn get_active_window(&self) -> Result<Window>;
-    // fn watch(&self) -> Result<Box<dyn Stream<Item = Window>>>;
+pub enum Event {
+    WindowOpenedOrChanged { window: Window },
+    WindowClosed { id: u8 },
+}
+
+pub trait CompositorWatcher: fmt::Debug + fd::AsRawFd {
+    fn read_event(&mut self) -> Result<Option<Event>>;
 }
 
 pub fn detect_compositor() -> Result<Box<dyn CompositorWatcher>> {
     #[cfg(feature = "niri")]
-    if let Ok(socket) = std::env::var(NIRI_SOCKET_PATH_ENV) {
-        let watcher = crate::compositors::niri::NiriEventSource::new(socket)?;
+    if let Ok(socket_path) = std::env::var(NIRI_SOCKET_PATH_ENV) {
+        let watcher = crate::compositors::niri::NiriEventSource::new(socket_path)?;
         return Ok(Box::new(watcher));
     }
 

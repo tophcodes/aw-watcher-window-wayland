@@ -8,7 +8,7 @@ extern crate chrono;
 extern crate gethostname;
 extern crate getopts;
 
-#[macro_use] extern crate lazy_static;
+// #[macro_use] extern crate lazy_static;
 // #[macro_use] extern crate smallvec;
 
 mod current_window;
@@ -16,15 +16,16 @@ mod compositor;
 mod compositors;
 mod idle;
 mod singleinstance;
+mod watcher;
 
 use std::env;
 // use std::time::Duration;
-use std::os::unix::io::AsRawFd;
 
-use mio::{Poll, Token, Events};
+use crate::compositor::{Event, CompositorWatcher};
+use mio::{Poll, Token, Events, Interest};
+use mio::unix::SourceFd;
 // use timerfd::{TimerFd, TimerState, SetTimeFlags};
 use anyhow::{Result, Context};
-
 use serde_json::{Map, Value};
 use chrono::prelude::*;
 
@@ -52,12 +53,72 @@ fn window_to_event(window: &current_window::Window) -> aw_client_rust::Event {
     }
 }
 
-// Setup some tokens to allow us to identify which event is for which socket.
-const STATE_CHANGE: Token = Token(0);
-const TIMER: Token = Token(1);
+const COMPOSITOR_TOKEN : Token = Token(0);
 
 static HEARTBEAT_INTERVAL_MS : u32 = 5000;
 static HEARTBEAT_INTERVAL_MARGIN_S : f64 = (HEARTBEAT_INTERVAL_MS + 1000) as f64 / 1000.0;
+
+struct EventLoop {
+    poll: Poll,
+    watcher: Box<dyn CompositorWatcher>,    
+}
+
+impl EventLoop {
+    pub fn new(watcher: Box<dyn CompositorWatcher>) -> Result<Self> {
+        let mut poll = Poll::new().context("Failed to create poll fds")?;
+
+        poll.registry().register(
+            &mut SourceFd(&watcher.as_raw_fd()),
+            COMPOSITOR_TOKEN,
+            Interest::READABLE,
+        ).context("Failed to register state_change fd")?;
+
+        // poll.registry()
+        //     .register(&mut timer.as_raw_fd(), TIMER, Ready::readable(), PollOpt::empty())
+        //     .context("Failed to register timer fd")?;
+
+        Ok(Self {
+            poll,
+            watcher,
+        })
+    }
+
+    pub fn run(mut self) -> Result<()> {
+        let mut events = Events::with_capacity(128);
+
+        // let mut prev_window : Option<current_window::Window> = None;
+        loop {
+            self.poll.poll(&mut events, None)?;
+
+            for event in &events {
+                match event.token() {
+                    COMPOSITOR_TOKEN if event.is_readable() => {
+                        while let Some(evt) = self.watcher.read_event()? {
+                            self.handle_compositor_event(evt)?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn handle_compositor_event(&self, event: Event) -> Result<()> {
+        match event {
+            Event::WindowOpenedOrChanged { window } => {
+                println!("Window: {:?}", window);
+            }
+            Event::WindowClosed { id } => {
+                println!("Closed: {:?}", id);
+            }
+            _ => {
+                println!("Oh no")
+            }
+        }
+
+        Ok(())
+    }
+}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -80,9 +141,14 @@ fn main() -> Result<()> {
         testing = true;
     }
 
-    println!("### Setting up display");
-    let comp = compositor::detect_compositor();
-    println!("{:?}", comp);
+    println!("### Determining compositor");
+    let mut listener = compositor::detect_compositor()?;
+    println!("{:?}", listener);
+
+    let event_loop = EventLoop::new(listener)?;
+    event_loop.run()?;
+
+    return Ok(());
     
     // let display = get_wl_display();
     // let mut event_queue = display.create_event_queue();
@@ -135,7 +201,6 @@ fn main() -> Result<()> {
     // let timer_flags = SetTimeFlags::Default;
     // timer.set_state(timer_state, timer_flags);
 
-
     println!("### Taking client locks");
     let host = "localhost";
     let port = match testing {
@@ -157,27 +222,12 @@ fn main() -> Result<()> {
     client.create_bucket_simple(&afk_bucket, "afkstatus")
         .expect("Failed to create afk bucket");
 
-    // Set-up polling
-    let mut poll = Poll::new().context("Failed to create poll fds")?;
-
-    // poll.registry()
-    //     .register(&mut fd, STATE_CHANGE, Ready::readable(), PollOpt::empty())
-    //     .context("Failed to register state_change fd")?;
-
     // poll.registry()
     //     .register(&mut timer.as_raw_fd(), TIMER, Ready::readable(), PollOpt::empty())
     //     .context("Failed to register timer fd")?;
 
     println!("### Watcher is now running");
 
-    let mut events = Events::with_capacity(1);
-    let mut prev_window : Option<current_window::Window> = None;
-    loop {
-        poll.poll(&mut events, None)?;
-
-        for event in &events {
-            match event.token() {
-                STATE_CHANGE => {
                     // event_queue
                     //     .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ } )
                     //     .expect("event_queue dispatch failure");
@@ -211,8 +261,7 @@ fn main() -> Result<()> {
                     //         break;
                     //     }
                     // }
-                },
-                TIMER => {
+                    // 
                     //println!("timer!");
                     // timer.read();
 
@@ -231,9 +280,4 @@ fn main() -> Result<()> {
                     //         break;
                     //     }
                     // }
-                },
-                _ => panic!("Invalid token!")
-            }
-        }
-    }
 }

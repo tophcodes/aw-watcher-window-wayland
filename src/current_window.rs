@@ -1,46 +1,46 @@
-use std::collections::HashMap;
+// use std::collections::HashMap;
 // use wayland_client::Main;
-use std::sync::Mutex;
+// use std::sync::Mutex;
 
 // use super::wl_client as wl_client;
 
 // use wl_client::toplevel_management::zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1 as ToplevelManager;
 // use wl_client::toplevel_management::zwlr_foreign_toplevel_handle_v1::ZwlrForeignToplevelHandleV1 as ToplevelHandle;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Window {
     pub title: String,
     pub appid: String,
     pub pid: Option<u32>,
 }
 
-pub struct WindowState {
-    pub current_window: Option<u32>,
-    pub all_windows: HashMap::<u32, Window>,
-}
+// pub struct WindowState {
+//     pub current_window: Option<u32>,
+//     pub all_windows: HashMap::<u32, Window>,
+// }
 
-lazy_static! {
-    static ref WINDOW_STATE_LOCKED: Mutex<WindowState> = Mutex::new(WindowState {
-        current_window: None,
-        all_windows: HashMap::new(),
-    });
-}
+// lazy_static! {
+//     static ref WINDOW_STATE_LOCKED: Mutex<WindowState> = Mutex::new(WindowState {
+//         current_window: None,
+//         all_windows: HashMap::new(),
+//     });
+// }
 
-pub fn get_focused_window() -> Option<Window> {
-    let window_state = WINDOW_STATE_LOCKED.lock()
-        .expect("Unable to take lock");
-    let current_window_id = match window_state.current_window {
-        Some(id) => id,
-        None => {
-            println!("No focused window");
-            return None;
-        }
-    };
-    match window_state.all_windows.get(&current_window_id) {
-        Some(window_ref) => Some(window_ref.clone()),
-        None => None
-    }
-}
+// pub fn get_focused_window() -> Option<Window> {
+//     let window_state = WINDOW_STATE_LOCKED.lock()
+//         .expect("Unable to take lock");
+//     let current_window_id = match window_state.current_window {
+//         Some(id) => id,
+//         None => {
+//             println!("No focused window");
+//             return None;
+//         }
+//     };
+//     match window_state.all_windows.get(&current_window_id) {
+//         Some(window_ref) => Some(window_ref.clone()),
+//         None => None
+//     }
+// }
 
 // fn assign_toplevel_handle(toplevel_handle: &wayland_client::Main<ToplevelHandle>) -> () {
 //     use wl_client::toplevel_management::zwlr_foreign_toplevel_handle_v1::Event as HandleEvent;

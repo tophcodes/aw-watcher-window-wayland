@@ -28,6 +28,7 @@ appdirs = "0.2"
 gethostname = "0.2"
 getopts = "0.2"
 aw-client-rust = { git = "https://github.com/ActivityWatch/aw-server-rust.git" }
+tokio = { version = "1.48.0", features = ["net"] }
 
 [features]
 default = ["wlr-protocols", "niri"]
