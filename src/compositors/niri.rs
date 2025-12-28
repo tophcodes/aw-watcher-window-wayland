@@ -1,8 +1,9 @@
 use anyhow::{Result, Context};
 use niri_ipc::socket::Socket;
+use niri_ipc::state::{EventStreamState, EventStreamStatePart};
 use niri_ipc::{Request, Reply, Response};
 use crate::current_window::Window;
-use crate::compositor::{Event, CompositorWatcher};
+use crate::compositor::CompositorWatcher;
 use std::os::unix::net::UnixStream;
 use mio::Registry;
 use mio::{Interest, Token};
@@ -13,6 +14,7 @@ use std::io::{Write, BufReader, BufRead};
 
 pub struct NiriEventSource {
     stream: io::BufReader<UnixStream>,
+    state: EventStreamState,
 }
 
 impl NiriEventSource {
@@ -37,7 +39,10 @@ impl NiriEventSource {
         reader.get_mut().set_nonblocking(true)?;
         reader.get_mut().shutdown(std::net::Shutdown::Write)?;
 
-        Ok(Self { stream: reader })
+        Ok(Self {
+            stream: reader,
+            state: EventStreamState::default(),
+        })
     }
 }
 
@@ -49,7 +54,7 @@ impl fd::AsRawFd for NiriEventSource {
 }
 
 impl CompositorWatcher for NiriEventSource {
-    fn read_event(&mut self) -> Result<Option<Event>> {
+    fn read_event(&mut self) -> Result<()> {
         let mut buf = String::new();
 
         match self.stream.read_line(&mut buf) {
@@ -58,19 +63,22 @@ impl CompositorWatcher for NiriEventSource {
                 use niri_ipc::Event as NiriEvent;
 
                 let event: NiriEvent = serde_json::from_str(buf.trim())?;
-                match event {
-                    NiriEvent::WindowFocusChanged { id } => {
-                        println!("window focus changed: {:?}", id);
-                    }
-                    _ => {
-                        println!("{:?}", event);
-                    }
-                }
-                Ok(None) //Some(event))
+                self.state.apply(event);
+
+                Ok(())
             }
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(None),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(()),
             Err(e) => Err(e.into()),
         }
+    }
+
+    fn get_active_window(&self) -> Option<Window> {
+        let focused_window = self.state.windows.windows
+            .values()
+            .find(|w| w.is_focused);
+
+        println!("{:?}", focused_window);
+        None
     }
 }
 

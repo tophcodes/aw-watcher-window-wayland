@@ -21,7 +21,7 @@ mod watcher;
 use std::env;
 // use std::time::Duration;
 
-use crate::compositor::{Event, CompositorWatcher};
+use crate::compositor::CompositorWatcher;
 use mio::{Poll, Token, Events, Interest};
 use mio::unix::SourceFd;
 // use timerfd::{TimerFd, TimerState, SetTimeFlags};
@@ -93,33 +93,17 @@ impl EventLoop {
             for event in &events {
                 match event.token() {
                     COMPOSITOR_TOKEN if event.is_readable() => {
-                        while let Some(evt) = self.watcher.read_event()? {
-                            self.handle_compositor_event(evt)?;
-                        }
+                        self.watcher.read_event()?;
+                        self.watcher.get_active_window();
+                        // TODO: Update active window/idle state
                     }
                     _ => {}
                 }
             }
         }
     }
-
-    fn handle_compositor_event(&self, event: Event) -> Result<()> {
-        match event {
-            Event::WindowOpenedOrChanged { window } => {
-                println!("Window: {:?}", window);
-            }
-            Event::WindowClosed { id } => {
-                println!("Closed: {:?}", id);
-            }
-            _ => {
-                println!("Oh no")
-            }
-        }
-
-        Ok(())
-    }
 }
-
+    
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();

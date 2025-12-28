@@ -5,13 +5,9 @@ use niri_ipc::socket::SOCKET_PATH_ENV as NIRI_SOCKET_PATH_ENV;
 use mio::event::Source;
 use std::os::fd;
 
-pub enum Event {
-    WindowOpenedOrChanged { window: Window },
-    WindowClosed { id: u8 },
-}
-
 pub trait CompositorWatcher: fmt::Debug + fd::AsRawFd {
-    fn read_event(&mut self) -> Result<Option<Event>>;
+    fn read_event(&mut self) -> Result<()>;
+    fn get_active_window(&self) -> Option<Window>;
 }
 
 pub fn detect_compositor() -> Result<Box<dyn CompositorWatcher>> {
