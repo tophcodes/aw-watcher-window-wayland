@@ -1,6 +1,7 @@
 use anyhow::{Result, Context};
 use crate::current_window::Window;
 use std::fmt;
+use niri_ipc::socket::SOCKET_PATH_ENV as NIRI_SOCKET_PATH_ENV;
 
 pub trait CompositorWatcher: fmt::Debug {
     fn get_active_window(&self) -> Result<Window>;
@@ -9,8 +10,8 @@ pub trait CompositorWatcher: fmt::Debug {
 
 pub fn detect_compositor() -> Result<Box<dyn CompositorWatcher>> {
     #[cfg(feature = "niri")]
-    if let Ok(socket) = std::env::var("NIRI_SOCKET") {
-        let watcher = crate::compositors::niri::NiriWatcher::new(socket)?;
+    if let Ok(socket) = std::env::var(NIRI_SOCKET_PATH_ENV) {
+        let watcher = crate::compositors::niri::NiriEventSource::new(socket)?;
         return Ok(Box::new(watcher));
     }
 
