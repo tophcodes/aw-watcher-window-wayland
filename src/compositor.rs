@@ -2,7 +2,6 @@ use anyhow::Result;
 use crate::current_window::Window;
 use std::fmt;
 use niri_ipc::socket::SOCKET_PATH_ENV as NIRI_SOCKET_PATH_ENV;
-use mio::event::Source;
 use std::os::fd;
 
 pub trait CompositorWatcher: fmt::Debug + fd::AsRawFd {

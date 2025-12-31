@@ -1,12 +1,9 @@
-use anyhow::{Result, Context};
-use niri_ipc::socket::Socket;
+use anyhow::Result;
 use niri_ipc::state::{EventStreamState, EventStreamStatePart};
 use niri_ipc::{Request, Reply, Response};
 use crate::current_window::Window;
 use crate::compositor::CompositorWatcher;
 use std::os::unix::net::UnixStream;
-use mio::Registry;
-use mio::{Interest, Token};
 use std::{fmt, io};
 use std::path::Path;
 use std::os::fd;

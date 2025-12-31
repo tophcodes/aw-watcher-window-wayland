@@ -16,12 +16,13 @@ mod compositor;
 mod compositors;
 mod idle;
 mod singleinstance;
-mod watcher;
+mod client;
 
 use std::env;
 // use std::time::Duration;
 
 use crate::compositor::CompositorWatcher;
+use crate::client::{Client, BucketType};
 use mio::{Poll, Token, Events, Interest};
 use mio::unix::SourceFd;
 // use timerfd::{TimerFd, TimerState, SetTimeFlags};
@@ -43,8 +44,10 @@ use chrono::prelude::*;
 
 fn window_to_event(window: &current_window::Window) -> aw_client_rust::Event {
     let mut data = Map::new();
+
     data.insert("app".to_string(), Value::String(window.appid.clone()));
     data.insert("title".to_string(), Value::String(window.title.clone()));
+
     aw_client_rust::Event {
         id: None,
         timestamp: Utc::now(),
@@ -59,12 +62,13 @@ static HEARTBEAT_INTERVAL_MS : u32 = 5000;
 static HEARTBEAT_INTERVAL_MARGIN_S : f64 = (HEARTBEAT_INTERVAL_MS + 1000) as f64 / 1000.0;
 
 struct EventLoop {
-    poll: Poll,
+    client: Client,
     watcher: Box<dyn CompositorWatcher>,    
+    poll: Poll,
 }
 
 impl EventLoop {
-    pub fn new(watcher: Box<dyn CompositorWatcher>) -> Result<Self> {
+    pub fn new(client: Client, watcher: Box<dyn CompositorWatcher>) -> Result<Self> {
         let mut poll = Poll::new().context("Failed to create poll fds")?;
 
         poll.registry().register(
@@ -78,6 +82,7 @@ impl EventLoop {
         //     .context("Failed to register timer fd")?;
 
         Ok(Self {
+            client,
             poll,
             watcher,
         })
@@ -86,7 +91,7 @@ impl EventLoop {
     pub fn run(mut self) -> Result<()> {
         let mut events = Events::with_capacity(128);
 
-        // let mut prev_window : Option<current_window::Window> = None;
+        let mut prev_window : Option<current_window::Window> = None;
         loop {
             self.poll.poll(&mut events, None)?;
 
@@ -94,9 +99,19 @@ impl EventLoop {
                 match event.token() {
                     COMPOSITOR_TOKEN if event.is_readable() => {
                         self.watcher.read_event()?;
-                        let window = self.watcher.get_active_window();
-                        println!("{:?}", window);
-                        // TODO: Update active window/idle state
+                        let current_window = self.watcher.get_active_window();
+
+                        // Only send heartbeat if window changed
+                        if current_window != prev_window {
+                            if let Some(ref window) = current_window {
+                                let window_event = window_to_event(window);
+                                if self.client.heartbeat(BucketType::Window, &window_event, HEARTBEAT_INTERVAL_MARGIN_S).is_err() {
+                                    eprintln!("Failed to send heartbeat");
+                                    return Err(anyhow::anyhow!("Failed to send heartbeat"));
+                                }
+                            }
+                            prev_window = current_window;
+                        }
                     }
                     _ => {}
                 }
@@ -108,29 +123,47 @@ impl EventLoop {
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
+
     let mut opts = getopts::Options::new();
     opts.optflag("", "testing", "run in testing mode");
     opts.optflag("h", "help", "print this help menu");
+
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => panic!("{}", f.to_string()),
     };
+
     if matches.opt_present("h") {
         let brief = format!("Usage: {} [options]", program);
         print!("{}", opts.usage(&brief));
         return Ok(());
     }
-    // Always testing mode with "cargo run", enable testing on release build with --testing
+
+    // Debug builds will always run in "testing" mode.
+    // Release builds will run in non-testing mode by default, but can be set to
+    // run with testing mode using the "--testing" flag
     let mut testing = cfg!(debug_assertions);
     if matches.opt_present("testing") {
         testing = true;
     }
 
-    println!("### Determining compositor");
-    let mut listener = compositor::detect_compositor()?;
-    println!("{:?}", listener);
+    let host = "localhost";
+    let port = match testing {
+        true => 5666,
+        false => 5600
+    };
 
-    let event_loop = EventLoop::new(listener)?;
+    println!("### Creating client and buckets");
+    let client = Client::new(host, port, "aw-watcher-wayland")?;
+    client.create_bucket_simple(BucketType::Window, "currentwindow")?;
+    client.create_bucket_simple(BucketType::AFK, "afkstatus")?;
+
+    println!("### Detecting compositor");
+    let listener = compositor::detect_compositor()?;
+    println!("### Determined compositor: {:?}", listener);
+
+    println!("### Starting event loop");
+    let event_loop = EventLoop::new(client, listener)?;
     event_loop.run()?;
 
     return Ok(());
@@ -187,11 +220,6 @@ fn main() -> Result<()> {
     // timer.set_state(timer_state, timer_flags);
 
     println!("### Taking client locks");
-    let host = "localhost";
-    let port = match testing {
-        true => 5666,
-        false => 5600
-    };
 
     let _window_lock = singleinstance::get_client_lock(&format!("aw-watcher-window-at-{}-on-{}", host, port)).unwrap();
     let _afk_lock = singleinstance::get_client_lock(&format!("aw-watcher-afk-at-{}-on-{}", host, port)).unwrap();
